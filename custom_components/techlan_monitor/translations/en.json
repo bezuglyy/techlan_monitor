@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Techlan Monitor",
+        "description": "Monitor HAOS and remote servers (Linux/Windows)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one instance of this integration is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Server Management",
+        "menu": {
+          "add_server": "Add Server",
+          "remove_server": "Remove Server",
+          "list_servers": "List Servers",
+          "install_agent": "Install Agent"
+        }
+      },
+      "add_server": {
+        "title": "Add Server",
+        "data": {
+          "host": "IP Address or Hostname",
+          "name": "Display Name (optional)",
+          "platform": "Platform",
+          "agent_port": "Agent Port",
+          "token": "Agent Token",
+          "username": "SSH Username",
+          "password": "SSH Password"
+        }
+      },
+      "remove_server": {
+        "title": "Remove Server",
+        "data": {
+          "server_id": "Server"
+        }
+      },
+      "list_servers": {
+        "title": "Server List",
+        "description": "{servers}"
+      },
+      "install_agent": {
+        "title": "Install Agent",
+        "data": {
+          "server_id": "Server for Installation"
+        }
+      }
+    },
+    "abort": {
+      "all_agents_installed": "Agent is already installed on all servers.",
+      "install_failed": "Failed to install agent."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "haos": {
+        "state_attributes": {
+          "cpu_usage": "CPU Usage",
+          "memory_pct": "Memory Usage",
+          "disk_usage": "Disk Usage"
+        }
+      },
+      "server": {
+        "state_attributes": {
+          "online": "Server Online",
+          "cores": "CPU Cores",
+          "cpu_usage": "CPU Usage",
+          "memory_total": "Total Memory",
+          "memory_used": "Used Memory",
+          "memory_free": "Free Memory",
+          "disks": "Disks",
+          "docker_containers": "Docker Containers",
+          "active_services": "Active Services",
+          "listening_ports": "Listening Ports",
+          "load": "Load Average",
+          "os": "Operating System",
+          "kernel": "Kernel",
+          "uptime_sec": "Uptime (seconds)",
+          "platform": "Platform"
+        }
+      }
+    }
+  },
+  "issues": {
+    "button_failed": {
+      "title": "Button {button} Failed",
+      "description": "Failed to execute action: {error}"
+    }
+  }
+}

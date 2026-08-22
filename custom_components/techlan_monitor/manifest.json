@@ -1,0 +1,14 @@
+{
+  "domain": "techlan_monitor",
+  "name": "Techlan Monitor",
+  "version": "1.0.0",
+  "requirements": ["asyncssh>=2.14.0"],
+  "dependencies": [],
+  "codeowners": ["@techlan"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "integration_type": "hub",
+  "documentation": "https://techlan.su",
+  "issue_tracker": "https://techlan.su",
+  "loggers": ["custom_components.techlan_monitor"]
+}

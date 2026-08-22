@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Techlan Monitor",
+        "description": "Интеграция для мониторинга HAOS и удалённых серверов (Linux/Windows)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Разрешён только один экземпляр интеграции."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Управление серверами",
+        "menu": {
+          "add_server": "Добавить сервер",
+          "remove_server": "Удалить сервер",
+          "list_servers": "Список серверов",
+          "install_agent": "Установить агента"
+        }
+      },
+      "add_server": {
+        "title": "Добавить сервер",
+        "data": {
+          "host": "IP-адрес или хост",
+          "name": "Имя (необязательно)",
+          "platform": "Платформа",
+          "agent_port": "Порт агента",
+          "token": "Токен агента",
+          "username": "SSH пользователь",
+          "password": "SSH пароль"
+        }
+      },
+      "remove_server": {
+        "title": "Удалить сервер",
+        "data": {
+          "server_id": "Сервер"
+        }
+      },
+      "list_servers": {
+        "title": "Список серверов",
+        "description": "{servers}"
+      },
+      "install_agent": {
+        "title": "Установка агента",
+        "data": {
+          "server_id": "Сервер для установки"
+        }
+      }
+    },
+    "abort": {
+      "all_agents_installed": "Агент установлен на все серверы.",
+      "install_failed": "Не удалось установить агента."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "haos": {
+        "state_attributes": {
+          "cpu_usage": "Использование CPU",
+          "memory_pct": "Использование памяти",
+          "disk_usage": "Использование диска"
+        }
+      },
+      "server": {
+        "state_attributes": {
+          "online": "Сервер онлайн",
+          "cores": "Ядер CPU",
+          "cpu_usage": "Использование CPU",
+          "memory_total": "Память всего",
+          "memory_used": "Память использовано",
+          "memory_free": "Память свободно",
+          "disks": "Диски",
+          "docker_containers": "Docker контейнеры",
+          "active_services": "Активные сервисы",
+          "listening_ports": "Открытые порты",
+          "load": "Load Average",
+          "os": "ОС",
+          "kernel": "Ядро",
+          "uptime_sec": "Uptime (сек)",
+          "platform": "Платформа"
+        }
+      }
+    }
+  },
+  "issues": {
+    "button_failed": {
+      "title": "Ошибка кнопки {button}",
+      "description": "Не удалось выполнить действие: {error}"
+    }
+  }
+}

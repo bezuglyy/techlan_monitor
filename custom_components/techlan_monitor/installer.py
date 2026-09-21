@@ -11,79 +11,30 @@ from __future__ import annotations
 import asyncio
 import logging
 import secrets
+from pathlib import Path
 from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
 # Версия устанавливаемого агента (артефакт agent/agent.py должен совпадать).
-AGENT_VERSION = "1.2.0"
+AGENT_VERSION = "1.2.1"
 # Общий таймаут установки (SSH + запись файлов + запуск службы).
 INSTALL_TIMEOUT = 120
 
 LINUX_TOKEN_FILE = "/opt/techlan-agent/agent.token"
 WINDOWS_TOKEN_FILE = r"C:\ProgramData\TechlanAgent\agent.token"
 
-# Текст скрипта агента для установки
-AGENT_SCRIPT = """#!/usr/bin/env python3
-# Этот файл будет заменён на полноценный agent.py
-# Устанавливается через SSH agent installer
+# Полноценный агент поставляется в пакете: agent/agent.py — единый артефакт.
+AGENT_SOURCE = Path(__file__).resolve().parent / "agent" / "agent.py"
 
-import json, os, platform, subprocess, sys, time
 
-VERSION = "1.2.0"
-PORT = int(os.environ.get("AGENT_PORT", "9100"))
-
-def run(cmd, timeout=10):
+def _agent_code() -> str:
+    """Исходник агента для установки (единый артефакт ``agent/agent.py``)."""
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip()
-    except: return ""
+        return AGENT_SOURCE.read_text(encoding="utf-8")
+    except OSError as err:  # pragma: no cover - защита поставки
+        raise RuntimeError(f"agent source not found: {AGENT_SOURCE}") from err
 
-IS_WIN = sys.platform == "win32"
-
-def collect():
-    if IS_WIN:
-        hostname = platform.node()
-        cpu = run(["wmic", "cpu", "get", "loadpercentage"], 5).split("\\n")[1].strip() or "0"
-        mem = run(["wmic", "computersystem", "get", "totalphysicalmemory"], 5).split("\\n")[1].strip() or "0"
-        return {"hostname":hostname,"platform":"windows","cpu_usage":float(cpu),"memory_total":int(mem)}
-    else:
-        hostname = run(["hostname"])
-        cpu = run(["nproc"], 5) or str(os.cpu_count() or 0)
-        load = read_file("/proc/loadavg").split()[:3] or ["0","0","0"]
-        return {"hostname":hostname,"platform":"linux","cpu_cores":int(cpu),"load":",".join(load)}
-
-def read_file(path):
-    try:
-        with open(path) as f: return f.read().strip()
-    except: return ""
-
-from http.server import BaseHTTPRequestHandler, HTTPServer
-class H(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if "/health" in self.path:
-            self._json({"ok":True,"version":VERSION,"hostname":platform.node(),"platform":sys.platform})
-        elif "/metrics" in self.path:
-            self._json(collect())
-        else:
-            self._json({"error":"not found"},404)
-    def _json(self,d,status=200):
-        b=json.dumps(d).encode()
-        self.send_response(status)
-        self.send_header("Content-Type","application/json")
-        self.end_headers()
-        self.wfile.write(b)
-    def log_message(self,f,*a): pass
-
-def main():
-    s = HTTPServer(("0.0.0.0",PORT), H)
-    print(f"[techlan-agent v{VERSION}] :{PORT}")
-    try: s.serve_forever()
-    except: s.shutdown()
-
-if __name__ == "__main__":
-    main()
-"""
 
 
 def generate_token() -> str:
@@ -147,7 +98,7 @@ async def _install_linux(conn: Any, port: int, token: str) -> bool:
     # Запись agent.py
     async with conn.start_sftp_client() as sftp:
         async with sftp.open("/opt/techlan-agent/agent.py", "w") as handle:
-            await handle.write(AGENT_SCRIPT)
+            await handle.write(_agent_code())
         # Запись токена (точка доверия агента).
         async with sftp.open(LINUX_TOKEN_FILE, "w") as handle:
             await handle.write(token)
@@ -203,7 +154,7 @@ async def _install_windows(conn: Any, port: int, token: str) -> bool:
 
     import base64
 
-    script_b64 = base64.b64encode(AGENT_SCRIPT.encode()).decode()
+    script_b64 = base64.b64encode(_agent_code().encode()).decode()
     await conn.run(
         "powershell -Command \"[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('"
         + script_b64

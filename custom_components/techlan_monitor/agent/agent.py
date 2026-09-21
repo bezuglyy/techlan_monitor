@@ -17,7 +17,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-AGENT_VERSION = "1.2.0"
+AGENT_VERSION = "1.2.1"
 AGENT_PORT = int(os.environ.get("AGENT_PORT", "9100"))
 
 # Явное разрешение работать без токена (только для отладки/совместимости).

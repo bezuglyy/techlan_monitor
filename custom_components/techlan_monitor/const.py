@@ -20,7 +20,7 @@ from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 DOMAIN: Final = "techlan_monitor"
-VERSION: Final = "1.2.0"
+VERSION: Final = "1.2.1"
 
 # Версия схемы config entry (minor обновляется при миграциях).
 CONFIG_MINOR_VERSION: Final = 3
@@ -88,27 +88,14 @@ UNIT_BYTES: Final = "B"
 UNIT_CORES: Final = "cores"
 UNIT_PORTS: Final = "ports"
 
-# --- HAOS сенсоры (локальный Supervisor API) ---
+# --- HAOS сенсоры (Supervisor API: http://supervisor/...) ---
+# Доступно в HA 2026.x: /host/info (hostname, operating_system, kernel,
+# agent_version, disk_used/disk_total, boot_timestamp), /supervisor/info
+# (version), /core/info (version).
+# CPU/память/температура/частота/load Supervisor API НЕ отдаёт — таких
+# сенсоров здесь нет (раньше показывали ложный 0).
 
 HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
-    "haos_cpu_usage": SensorEntityDescription(
-        key="haos_cpu_usage",
-        name="HAOS CPU Usage",
-        native_unit_of_measurement=UNIT_PCT,
-        suggested_unit_of_measurement=UNIT_PCT,
-        suggested_display_precision=1,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon=ICON_CPU,
-    ),
-    "haos_memory_usage": SensorEntityDescription(
-        key="haos_memory_usage",
-        name="HAOS Memory Usage",
-        native_unit_of_measurement=UNIT_PCT,
-        suggested_unit_of_measurement=UNIT_PCT,
-        suggested_display_precision=1,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon=ICON_MEMORY,
-    ),
     "haos_disk_usage": SensorEntityDescription(
         key="haos_disk_usage",
         name="HAOS Disk Usage",
@@ -123,48 +110,15 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         name="HAOS Uptime",
         icon=ICON_UPTIME,
     ),
-    "haos_cpu_temp": SensorEntityDescription(
-        key="haos_cpu_temp",
-        name="HAOS CPU Temperature",
-        native_unit_of_measurement="°C",
-        suggested_unit_of_measurement="°C",
-        suggested_display_precision=1,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon=ICON_CPU,
-    ),
-    "haos_cpu_freq": SensorEntityDescription(
-        key="haos_cpu_freq",
-        name="HAOS CPU Frequency",
-        native_unit_of_measurement="MHz",
-        suggested_unit_of_measurement="MHz",
-        state_class=SensorStateClass.MEASUREMENT,
-        icon=ICON_CPU,
-    ),
-    "haos_load_1m": SensorEntityDescription(
-        key="haos_load_1m",
-        name="HAOS Load 1m",
-        icon=ICON_LOAD,
-    ),
-    "haos_load_5m": SensorEntityDescription(
-        key="haos_load_5m",
-        name="HAOS Load 5m",
-        icon=ICON_LOAD,
-    ),
-    "haos_load_15m": SensorEntityDescription(
-        key="haos_load_15m",
-        name="HAOS Load 15m",
-        icon=ICON_LOAD,
-    ),
-    "haos_hostname": SensorEntityDescription(
-        key="haos_hostname",
-        name="HAOS Hostname",
-        icon=ICON_HOSTNAME,
+    "haos_core_version": SensorEntityDescription(
+        key="haos_core_version",
+        name="HAOS Core Version",
+        icon=ICON_OS,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "haos_os": SensorEntityDescription(
-        key="haos_os",
-        name="HAOS Version",
+    "haos_supervisor_version": SensorEntityDescription(
+        key="haos_supervisor_version",
+        name="HAOS Supervisor Version",
         icon=ICON_OS,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -172,6 +126,24 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         key="haos_agent_version",
         name="HAOS Agent Version",
         icon=ICON_HOSTNAME,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "haos_hostname": SensorEntityDescription(
+        key="haos_hostname",
+        name="HAOS Hostname",
+        icon=ICON_HOSTNAME,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "haos_kernel": SensorEntityDescription(
+        key="haos_kernel",
+        name="HAOS Kernel",
+        icon=ICON_KERNEL,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "haos_os": SensorEntityDescription(
+        key="haos_os",
+        name="HAOS OS",
+        icon=ICON_OS,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 }

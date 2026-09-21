@@ -236,6 +236,15 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 sys_info = await resp.json()
                 sys_data = sys_info.get("data", {})
 
+            # Информация о ядре HA
+            async with self.session.get(
+                "http://supervisor/core/info",
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT),
+            ) as resp:
+                core_info = await resp.json()
+                core_data = core_info.get("data", {})
+
             # Информация о супервизоре
             async with self.session.get(
                 "http://supervisor/supervisor/info",
@@ -254,33 +263,26 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 host_detail = await resp.json()
                 hd = host_detail.get("data", {})
 
-            # Парсим информацию
-            cpu_usage = host_data.get("cpu_percent", 0) or 0
-            memory_data = host_data.get("memory", {})
-            memory_usage = memory_data.get("percent", 0) if memory_data else 0
-            disk_data = host_data.get("disk", {})
-            disk_usage = disk_data.get("percent", 0) if disk_data else 0
-            cpu_temp = host_data.get("cpu_temperature", 0) or 0
-            cpu_freq = host_data.get("cpu_frequency", 0) or 0
+            # --- Разбор данных Supervisor API (HA 2026.x) ---
+            disk_total = float(host_data.get("disk_total") or 0)
+            disk_used = float(host_data.get("disk_used") or 0)
+            disk_usage = round(disk_used / disk_total * 100, 1) if disk_total else None
 
-            # Uptime из host data
-            uptime_sec = host_data.get("uptime", 0) or 0
-
-            # Load average
-            load = host_data.get("load", [0, 0, 0])
+            # /host/info отдаёт boot_timestamp в микросекундах
+            boot_ts = host_data.get("boot_timestamp")
+            uptime_sec = None
+            if isinstance(boot_ts, (int, float)) and boot_ts > 0:
+                uptime_sec = max(0, int(time.time() - boot_ts / 1_000_000))
 
             return {
                 "hostname": host_data.get("hostname", "haos"),
-                "version": sup_data.get("version", ""),
-                "os": sys_data.get("operating_system", ""),
-                "agent_version": sup_data.get("version", ""),
-                "cpu_usage": float(cpu_usage),
-                "cpu_temp": float(cpu_temp),
-                "cpu_freq": float(cpu_freq),
-                "memory_usage": float(memory_usage),
-                "disk_usage": float(disk_usage),
-                "uptime_sec": int(uptime_sec),
-                "load": load,
+                "os": host_data.get("operating_system", ""),
+                "kernel": host_data.get("kernel", ""),
+                "agent_version": host_data.get("agent_version", ""),   # HAOS agent
+                "supervisor_version": sup_data.get("version", ""),     # Supervisor
+                "core_version": core_data.get("version", ""),          # HA Core
+                "disk_usage": disk_usage,
+                "uptime_sec": uptime_sec,
                 "type": "haos",
             }
 

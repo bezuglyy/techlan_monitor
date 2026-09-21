@@ -141,30 +141,14 @@ class TechlanHaosSensor(BaseTechlanSensor):
         haos = data.get("haos", {})
 
         value_map = {
-            "haos_cpu_usage": lambda d: d.get("cpu_usage"),
-            "haos_memory_usage": lambda d: d.get("memory_usage"),
             "haos_disk_usage": lambda d: d.get("disk_usage"),
-            "haos_uptime": lambda d: self._format_uptime(d.get("uptime_sec", 0)),
-            "haos_cpu_temp": lambda d: d.get("cpu_temp"),
-            "haos_cpu_freq": lambda d: d.get("cpu_freq"),
-            "haos_load_1m": lambda d: (
-                str(d.get("load", [0, 0, 0])[0])
-                if isinstance(d.get("load"), list)
-                else d.get("load")
-            ),
-            "haos_load_5m": lambda d: (
-                str(d.get("load", [0, 0, 0])[1])
-                if isinstance(d.get("load"), list)
-                else d.get("load")
-            ),
-            "haos_load_15m": lambda d: (
-                str(d.get("load", [0, 0, 0])[2])
-                if isinstance(d.get("load"), list)
-                else d.get("load")
-            ),
-            "haos_hostname": lambda d: d.get("hostname", ""),
-            "haos_os": lambda d: d.get("os", ""),
+            "haos_uptime": lambda d: self._format_uptime(d.get("uptime_sec")),
+            "haos_core_version": lambda d: d.get("core_version", ""),
+            "haos_supervisor_version": lambda d: d.get("supervisor_version", ""),
             "haos_agent_version": lambda d: d.get("agent_version", ""),
+            "haos_hostname": lambda d: d.get("hostname", ""),
+            "haos_kernel": lambda d: d.get("kernel", ""),
+            "haos_os": lambda d: d.get("os", ""),
         }
 
         getter = value_map.get(self._sensor_key)
@@ -173,8 +157,10 @@ class TechlanHaosSensor(BaseTechlanSensor):
         return None
 
     @staticmethod
-    def _format_uptime(sec: int) -> str:
-        """Форматирование uptime."""
+    def _format_uptime(sec: int | None) -> str | None:
+        """Форматирование uptime (None → unknown)."""
+        if sec is None:
+            return None
         days = sec // 86400
         hours = (sec % 86400) // 3600
         minutes = (sec % 3600) // 60
@@ -195,12 +181,14 @@ class TechlanHaosSensor(BaseTechlanSensor):
         haos = data.get("haos", {})
 
         attrs: dict[str, Any] = {}
-        if cpu := haos.get("cpu_usage"):
-            attrs[ATTR_CPU_USAGE] = cpu
-        if mem := haos.get("memory_usage"):
-            attrs[ATTR_MEM_PCT] = mem
         if disk := haos.get("disk_usage"):
             attrs["disk_usage"] = disk
+        if os_name := haos.get("os"):
+            attrs[ATTR_OS] = os_name
+        if kernel := haos.get("kernel"):
+            attrs[ATTR_KERNEL] = kernel
+        if up := haos.get("uptime_sec"):
+            attrs[ATTR_UPTIME] = up
         return attrs or None
 
 

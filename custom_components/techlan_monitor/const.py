@@ -6,16 +6,27 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Final
 
-from homeassistant.components.sensor import SensorEntityDescription
-from homeassistant.components.binary_sensor import BinarySensorEntityDescription
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntityDescription,
+)
 from homeassistant.components.button import ButtonEntityDescription
+from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 DOMAIN: Final = "techlan_monitor"
-VERSION: Final = "1.0.0"
+VERSION: Final = "1.2.0"
+
+# Версия схемы config entry (minor обновляется при миграциях).
+CONFIG_MINOR_VERSION: Final = 3
 
 # Платформы
-PLATFORMS: Final[list[str]] = ["sensor", "binary_sensor", "button"]
+PLATFORMS: Final[list[str]] = ["sensor", "binary_sensor", "button", "switch"]
 
 # Порты
 DEFAULT_AGENT_PORT: Final = 9100
@@ -30,6 +41,12 @@ CONF_TOKEN: Final = "token"
 CONF_SSH_USER: Final = "ssh_user"
 CONF_SSH_PASS: Final = "ssh_pass"
 CONF_AGENT_INSTALLED: Final = "agent_installed"
+# Транспорт: HTTPS к агенту (обычно за TLS-прокси) и проверка сертификата.
+CONF_USE_HTTPS: Final = "use_https"
+CONF_VERIFY_TLS: Final = "verify_tls"
+# Двухшаговое подтверждение перезагрузки: окно действия предохранителя.
+CONF_REBOOT_CONFIRM_SECONDS: Final = "reboot_confirm_seconds"
+DEFAULT_REBOOT_CONFIRM_SECONDS: Final = 60
 
 # Типы платформ
 PLATFORM_LINUX: Final = "linux"
@@ -80,6 +97,7 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UNIT_PCT,
         suggested_unit_of_measurement=UNIT_PCT,
         suggested_display_precision=1,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_CPU,
     ),
     "haos_memory_usage": SensorEntityDescription(
@@ -88,6 +106,7 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UNIT_PCT,
         suggested_unit_of_measurement=UNIT_PCT,
         suggested_display_precision=1,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_MEMORY,
     ),
     "haos_disk_usage": SensorEntityDescription(
@@ -96,6 +115,7 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UNIT_PCT,
         suggested_unit_of_measurement=UNIT_PCT,
         suggested_display_precision=1,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_DISK,
     ),
     "haos_uptime": SensorEntityDescription(
@@ -109,7 +129,8 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement="°C",
         suggested_unit_of_measurement="°C",
         suggested_display_precision=1,
-        device_class="temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_CPU,
     ),
     "haos_cpu_freq": SensorEntityDescription(
@@ -117,6 +138,7 @@ HAOS_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         name="HAOS CPU Frequency",
         native_unit_of_measurement="MHz",
         suggested_unit_of_measurement="MHz",
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_CPU,
     ),
     "haos_load_1m": SensorEntityDescription(
@@ -163,6 +185,7 @@ SERVER_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UNIT_PCT,
         suggested_unit_of_measurement=UNIT_PCT,
         suggested_display_precision=1,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_CPU,
     ),
     "memory_pct": SensorEntityDescription(
@@ -171,6 +194,7 @@ SERVER_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UNIT_PCT,
         suggested_unit_of_measurement=UNIT_PCT,
         suggested_display_precision=1,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_MEMORY,
     ),
     "memory_total": SensorEntityDescription(
@@ -178,7 +202,8 @@ SERVER_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         name="Memory Total",
         native_unit_of_measurement=UNIT_BYTES,
         suggested_unit_of_measurement=UNIT_BYTES,
-        device_class="data_size",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_MEMORY,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -187,7 +212,8 @@ SERVER_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         name="Memory Used",
         native_unit_of_measurement=UNIT_BYTES,
         suggested_unit_of_measurement=UNIT_BYTES,
-        device_class="data_size",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_MEMORY,
     ),
     "memory_free": SensorEntityDescription(
@@ -195,7 +221,8 @@ SERVER_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         name="Memory Free",
         native_unit_of_measurement=UNIT_BYTES,
         suggested_unit_of_measurement=UNIT_BYTES,
-        device_class="data_size",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
         icon=ICON_MEMORY,
     ),
     "uptime": SensorEntityDescription(
@@ -214,6 +241,12 @@ SERVER_SENSORS: Final[dict[str, SensorEntityDescription]] = {
         icon=ICON_HOSTNAME,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    "agent_version": SensorEntityDescription(
+        key="agent_version",
+        name="Agent Version",
+        icon=ICON_HOSTNAME,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 }
 
 # --- Серверные Binary Sensor ---
@@ -222,7 +255,8 @@ SERVER_BINARY_SENSORS: Final[dict[str, BinarySensorEntityDescription]] = {
     "alive": BinarySensorEntityDescription(
         key="alive",
         name="Server Online",
-        device_class="connectivity",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
         icon=ICON_SERVER,
     ),
 }
@@ -251,6 +285,30 @@ HAOS_BUTTONS: Final[dict[str, ButtonEntityDescription]] = {
         key="restart_haos",
         name="Restart HAOS",
         icon="mdi:restart",
+        entity_category=EntityCategory.CONFIG,
+    ),
+}
+
+# --- Предохранители перезагрузки (двухшаговое подтверждение) ---
+
+# Ключ предохранителя HAOS и виртуальный id сервера HAOS.
+HAOS_ARMED_KEY: Final = "haos_reboot_armed"
+SERVER_ARMED_KEY: Final = "reboot_armed"
+
+HAOS_SWITCHES: Final[dict[str, SwitchEntityDescription]] = {
+    HAOS_ARMED_KEY: SwitchEntityDescription(
+        key=HAOS_ARMED_KEY,
+        name="Разрешить перезагрузку HAOS",
+        icon="mdi:shield-lock-outline",
+        entity_category=EntityCategory.CONFIG,
+    ),
+}
+
+SERVER_SWITCHES: Final[dict[str, SwitchEntityDescription]] = {
+    SERVER_ARMED_KEY: SwitchEntityDescription(
+        key=SERVER_ARMED_KEY,
+        name="Разрешить перезагрузку",
+        icon="mdi:shield-lock-outline",
         entity_category=EntityCategory.CONFIG,
     ),
 }

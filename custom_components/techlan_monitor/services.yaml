@@ -1,0 +1,44 @@
+reboot_server:
+  name: Перезагрузить сервер
+  description: >-
+    Перезагрузить удалённый сервер через агента. Требуется явное подтверждение
+    (confirm: true) и настроенный токен агента.
+  fields:
+    server_id:
+      name: Сервер
+      description: Идентификатор сервера (например, server_192_168_100_110).
+      required: true
+      example: server_192_168_100_110
+      selector:
+        text:
+    confirm:
+      name: Подтверждение
+      description: Должно быть true для выполнения перезагрузки.
+      required: true
+      default: false
+      selector:
+        boolean:
+
+restart_haos:
+  name: Перезагрузить HAOS
+  description: Перезагрузить хост Home Assistant OS. Требуется confirm true.
+  fields:
+    confirm:
+      name: Подтверждение
+      description: Должно быть true для выполнения перезагрузки.
+      required: true
+      default: false
+      selector:
+        boolean:
+
+reboot_core:
+  name: Перезагрузить HA Core
+  description: Перезапустить ядро Home Assistant (Core). Требуется confirm true.
+  fields:
+    confirm:
+      name: Подтверждение
+      description: Должно быть true для перезапуска.
+      required: true
+      default: false
+      selector:
+        boolean:

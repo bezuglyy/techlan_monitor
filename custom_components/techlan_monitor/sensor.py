@@ -17,9 +17,10 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from ._shared.shared_entities import build_device_info
 
 from .const import (
     DOMAIN,
@@ -98,7 +99,6 @@ class BaseTechlanSensor(CoordinatorEntity[TechlanDataCoordinator], SensorEntity)
     @callback
     def _handle_coordinator_update(self) -> None:
         """Обновление от координатора."""
-        self._update_state()
         self.async_write_ha_state()
 
     def _get_value(self) -> Any:
@@ -121,8 +121,11 @@ class TechlanHaosSensor(BaseTechlanSensor):
         """Инициализация."""
         super().__init__(coordinator, entry, sensor_key, description)
         self._attr_unique_id = f"{entry.entry_id}_{sensor_key}"
-        self._attr_device_info = DeviceInfo(
+        self._attr_device_info = build_device_info(
             identifiers={(DOMAIN, "haos")},
+            name=coordinator.haos_hostname or "Home Assistant OS",
+            model="HAOS",
+            sw_version=coordinator.haos_version or None,
         )
 
     @property
@@ -221,11 +224,12 @@ class TechlanServerSensor(BaseTechlanSensor):
         self._server_config = config
         hostname = config.get(CONF_HOST, "unknown")
         self._attr_unique_id = f"{entry.entry_id}_{server_id}_{sensor_key}"
-        self._attr_device_info = DeviceInfo(
+        self._attr_device_info = build_device_info(
             identifiers={(DOMAIN, server_id)},
             name=config.get(CONF_NAME, hostname),
             model=config.get(CONF_PLATFORM, "linux").capitalize(),
             manufacturer="Techlan",
+            via_device_id=self.coordinator.haos_device_id,
             via_device=(DOMAIN, "haos"),
         )
 

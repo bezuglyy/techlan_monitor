@@ -18,7 +18,8 @@
           "add_server": "Добавить сервер",
           "remove_server": "Удалить сервер",
           "list_servers": "Список серверов",
-          "install_agent": "Установить агента"
+          "install_agent": "Установить агента",
+          "settings": "Settings"
         }
       },
       "add_server": {
@@ -30,7 +31,9 @@
           "agent_port": "Порт агента",
           "token": "Токен агента",
           "username": "SSH пользователь",
-          "password": "SSH пароль"
+          "password": "SSH пароль",
+          "use_https": "Use HTTPS for agent",
+          "verify_tls": "Verify TLS certificate"
         }
       },
       "remove_server": {
@@ -46,13 +49,22 @@
       "install_agent": {
         "title": "Установка агента",
         "data": {
-          "server_id": "Сервер для установки"
+          "server_id": "Сервер для установки",
+          "confirm": "Подтверждаю установку"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Reboot confirmation window.",
+        "data": {
+          "reboot_confirm_seconds": "Reboot confirmation window, seconds"
         }
       }
     },
     "abort": {
       "all_agents_installed": "Агент установлен на все серверы.",
-      "install_failed": "Не удалось установить агента."
+      "install_failed": "Не удалось установить агента.",
+      "install_not_confirmed": "Установка не подтверждена."
     }
   },
   "entity": {
@@ -83,12 +95,32 @@
           "platform": "Платформа"
         }
       }
+    },
+    "switch": {
+      "reboot_armed": {
+        "name": "Allow reboot"
+      },
+      "haos_reboot_armed": {
+        "name": "Allow HAOS reboot"
+      }
     }
   },
   "issues": {
     "button_failed": {
       "title": "Ошибка кнопки {button}",
       "description": "Не удалось выполнить действие: {error}"
+    },
+    "haos_unreachable": {
+      "title": "HAOS Supervisor недоступен",
+      "description": "Не удалось получить данные от Supervisor API: {error}. Проверьте работу Home Assistant OS."
+    },
+    "reboot_not_confirmed": {
+      "title": "Reboot not confirmed",
+      "description": "Target {target}: reboot was not confirmed. Turn on the \"Allow reboot\" switch and retry within the confirmation window."
+    },
+    "agent_token_missing": {
+      "title": "Agent token missing",
+      "description": "Server {server_id} ({host}): the agent was installed without a token. Dangerous operations are denied (fail-closed). Reinstall the agent via Options -> Install Agent to provision a token."
     }
   }
 }

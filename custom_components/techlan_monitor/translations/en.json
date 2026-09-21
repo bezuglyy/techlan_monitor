@@ -18,7 +18,8 @@
           "add_server": "Add Server",
           "remove_server": "Remove Server",
           "list_servers": "List Servers",
-          "install_agent": "Install Agent"
+          "install_agent": "Install Agent",
+          "settings": "Settings"
         }
       },
       "add_server": {
@@ -30,7 +31,9 @@
           "agent_port": "Agent Port",
           "token": "Agent Token",
           "username": "SSH Username",
-          "password": "SSH Password"
+          "password": "SSH Password",
+          "use_https": "Use HTTPS for agent",
+          "verify_tls": "Verify TLS certificate"
         }
       },
       "remove_server": {
@@ -46,13 +49,22 @@
       "install_agent": {
         "title": "Install Agent",
         "data": {
-          "server_id": "Server for Installation"
+          "server_id": "Server for Installation",
+          "confirm": "Confirm installation"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Reboot confirmation window.",
+        "data": {
+          "reboot_confirm_seconds": "Reboot confirmation window, seconds"
         }
       }
     },
     "abort": {
       "all_agents_installed": "Agent is already installed on all servers.",
-      "install_failed": "Failed to install agent."
+      "install_failed": "Failed to install agent.",
+      "install_not_confirmed": "Installation was not confirmed."
     }
   },
   "entity": {
@@ -83,12 +95,32 @@
           "platform": "Platform"
         }
       }
+    },
+    "switch": {
+      "reboot_armed": {
+        "name": "Allow reboot"
+      },
+      "haos_reboot_armed": {
+        "name": "Allow HAOS reboot"
+      }
     }
   },
   "issues": {
     "button_failed": {
       "title": "Button {button} Failed",
       "description": "Failed to execute action: {error}"
+    },
+    "haos_unreachable": {
+      "title": "HAOS Supervisor unreachable",
+      "description": "Could not fetch data from the Supervisor API: {error}. Check Home Assistant OS."
+    },
+    "reboot_not_confirmed": {
+      "title": "Reboot not confirmed",
+      "description": "Target {target}: reboot was not confirmed. Turn on the \"Allow reboot\" switch and retry within the confirmation window."
+    },
+    "agent_token_missing": {
+      "title": "Agent token missing",
+      "description": "Server {server_id} ({host}): the agent was installed without a token. Dangerous operations are denied (fail-closed). Reinstall the agent via Options -> Install Agent to provision a token."
     }
   }
 }

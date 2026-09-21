@@ -10,18 +10,51 @@ from __future__ import annotations
 import json
 import os
 import platform
-import shutil
+import secrets
 import signal
 import subprocess
 import sys
-import time
-from functools import wraps
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-AGENT_VERSION = "1.0.0"
+AGENT_VERSION = "1.2.0"
 AGENT_PORT = int(os.environ.get("AGENT_PORT", "9100"))
-AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "")
+
+# Явное разрешение работать без токена (только для отладки/совместимости).
+AGENT_ALLOW_INSECURE = os.environ.get("AGENT_ALLOW_INSECURE", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+# Порядок поиска токена: env AGENT_TOKEN → AGENT_TOKEN_FILE → стандартные пути.
+TOKEN_FILE_CANDIDATES = [
+    os.environ.get("AGENT_TOKEN_FILE", "").strip(),
+    "/opt/techlan-agent/agent.token",
+    r"C:\ProgramData\TechlanAgent\agent.token",
+]
+
+
+def _load_token() -> str:
+    """Resolve the agent token from environment or token files."""
+    token = os.environ.get("AGENT_TOKEN", "").strip()
+    if token:
+        return token
+    for path in TOKEN_FILE_CANDIDATES:
+        if not path:
+            continue
+        try:
+            with open(path, encoding="utf-8") as handle:
+                value = handle.read().strip()
+            if value:
+                return value
+        except Exception:  # noqa: BLE001 - missing file is normal
+            continue
+    return ""
+
+
+AGENT_TOKEN = _load_token()
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -418,41 +451,66 @@ def collect_windows() -> dict:
 # ─── HTTP server ──────────────────────────────────────────────────────
 
 
-def check_token(handler: BaseHTTPRequestHandler) -> bool:
-    if not AGENT_TOKEN:
-        return True
-    token = handler.headers.get("Authorization", "").replace("Bearer ", "")
-    if token == AGENT_TOKEN:
-        return True
-    handler.send_response(401)
-    handler.end_headers()
-    handler.wfile.write(b'{"error":"unauthorized"}')
-    return False
+def _token_matches(handler: BaseHTTPRequestHandler) -> bool:
+    """Constant-time comparison of the presented Bearer token."""
+    presented = handler.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not presented or not AGENT_TOKEN:
+        return False
+    return secrets.compare_digest(presented, AGENT_TOKEN)
 
 
 class AgentHandler(BaseHTTPRequestHandler):
     server_version = f"TechlanAgent/{AGENT_VERSION}"
 
+    # --- authorization (fail-closed) -----------------------------------------
+
+    def _authorize(self) -> bool:
+        """Authorize a read endpoint; deny when no token is configured."""
+        if AGENT_TOKEN:
+            if _token_matches(self):
+                return True
+            self._json({"error": "unauthorized"}, 401)
+            return False
+        # No token: fail closed. Only an explicit opt-in allows read access.
+        if AGENT_ALLOW_INSECURE:
+            return True
+        self._json(
+            {
+                "error": "agent token is not configured",
+                "hint": "reinstall the agent with a token or set AGENT_ALLOW_INSECURE=1",
+                "secure": False,
+            },
+            503,
+        )
+        return False
+
     def do_GET(self) -> None:
-        if not check_token(self):
-            return
         parsed = urlparse(self.path)
+        # Health stays open on purpose: it carries only version/identity and is
+        # needed to discover the agent version during migration.
+        if parsed.path in ("/api/v1/health", "/health"):
+            self._json(
+                {
+                    "ok": True,
+                    "version": AGENT_VERSION,
+                    "hostname": platform.node(),
+                    "platform": sys.platform,
+                    "auth": "token" if AGENT_TOKEN else "none",
+                    "secure": bool(AGENT_TOKEN),
+                }
+            )
+            return
+        if not self._authorize():
+            return
         match parsed.path:
-            case "/api/v1/health":
-                self._json(
-                    {
-                        "ok": True,
-                        "version": AGENT_VERSION,
-                        "hostname": platform.node(),
-                        "platform": sys.platform,
-                    }
-                )
             case "/api/v1/metrics":
                 data = collect_linux() if not IS_WINDOWS else collect_windows()
+                data["agent_version"] = AGENT_VERSION
+                data["auth"] = "token" if AGENT_TOKEN else "insecure"
                 self._json(data)
             case "/api/v1/services":
                 svc = linux_services() if not IS_WINDOWS else win_services()
-                self._json({"services": svc})
+                self._json({"services": svc, "agent_version": AGENT_VERSION})
             case "/api/v1/docker":
                 dkr = linux_docker() if not IS_WINDOWS else win_docker()
                 self._json(dkr)
@@ -460,17 +518,30 @@ class AgentHandler(BaseHTTPRequestHandler):
                 self._json({"error": "not found"}, 404)
 
     def do_POST(self) -> None:
-        if not check_token(self):
-            return
         parsed = urlparse(self.path)
-        if parsed.path == "/api/v1/reboot":
-            self._json({"ok": True, "message": "rebooting..."})
-            if IS_WINDOWS:
-                os.system("shutdown /r /t 3")
-            else:
-                os.system("reboot")
-        else:
+        if parsed.path != "/api/v1/reboot":
             self._json({"error": "not found"}, 404)
+            return
+        # Dangerous operation: never allowed without a configured token, even
+        # in the insecure read-only mode.
+        if not AGENT_TOKEN:
+            self._json(
+                {
+                    "error": "reboot is disabled: AGENT_TOKEN is not configured",
+                    "secure": False,
+                },
+                403,
+            )
+            return
+        if not self._authorize():
+            return
+        self._json(
+            {"ok": True, "message": "rebooting...", "agent_version": AGENT_VERSION}
+        )
+        if IS_WINDOWS:
+            os.system("shutdown /r /t 3")
+        else:
+            os.system("reboot")
 
     def _json(self, data: dict, status: int = 200) -> None:
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -489,6 +560,20 @@ def main() -> None:
     print(
         f"[techlan-agent v{AGENT_VERSION}] listening on :{AGENT_PORT} (platform={sys.platform})"
     )
+    if not AGENT_TOKEN:
+        if AGENT_ALLOW_INSECURE:
+            print(
+                "[techlan-agent] WARNING: no AGENT_TOKEN; running INSECURE read-only "
+                "(reboot disabled). Set AGENT_TOKEN to secure the agent.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "[techlan-agent] WARNING: no AGENT_TOKEN; read endpoints are DENIED "
+                "(fail-closed) and reboot is disabled. Reinstall with a token or set "
+                "AGENT_ALLOW_INSECURE=1 for legacy read-only access.",
+                file=sys.stderr,
+            )
 
     def shutdown(sig, frame):
         print("[techlan-agent] shutting down...")

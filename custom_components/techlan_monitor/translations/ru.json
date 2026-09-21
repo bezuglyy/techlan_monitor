@@ -18,7 +18,8 @@
           "add_server": "Добавить сервер",
           "remove_server": "Удалить сервер",
           "list_servers": "Список серверов",
-          "install_agent": "Установить агента"
+          "install_agent": "Установить агента",
+          "settings": "Настройки"
         }
       },
       "add_server": {
@@ -30,7 +31,9 @@
           "agent_port": "Порт агента",
           "token": "Токен агента",
           "username": "SSH пользователь",
-          "password": "SSH пароль"
+          "password": "SSH пароль",
+          "use_https": "HTTPS к агенту",
+          "verify_tls": "Проверять TLS-сертификат"
         }
       },
       "remove_server": {
@@ -46,13 +49,22 @@
       "install_agent": {
         "title": "Установка агента",
         "data": {
-          "server_id": "Сервер для установки"
+          "server_id": "Сервер для установки",
+          "confirm": "Подтверждаю установку"
+        }
+      },
+      "settings": {
+        "title": "Настройки",
+        "description": "Окно подтверждения перезагрузки.",
+        "data": {
+          "reboot_confirm_seconds": "Окно подтверждения перезагрузки, секунд"
         }
       }
     },
     "abort": {
       "all_agents_installed": "Агент уже установлен на все серверы.",
-      "install_failed": "Не удалось установить агента."
+      "install_failed": "Не удалось установить агента.",
+      "install_not_confirmed": "Установка не подтверждена."
     }
   },
   "entity": {
@@ -83,12 +95,32 @@
           "platform": "Платформа"
         }
       }
+    },
+    "switch": {
+      "reboot_armed": {
+        "name": "Разрешить перезагрузку"
+      },
+      "haos_reboot_armed": {
+        "name": "Разрешить перезагрузку HAOS"
+      }
     }
   },
   "issues": {
     "button_failed": {
       "title": "Ошибка кнопки {button}",
       "description": "Не удалось выполнить действие: {error}"
+    },
+    "haos_unreachable": {
+      "title": "HAOS Supervisor недоступен",
+      "description": "Не удалось получить данные от Supervisor API: {error}. Проверьте работу Home Assistant OS."
+    },
+    "reboot_not_confirmed": {
+      "title": "Перезагрузка не подтверждена",
+      "description": "Цель {target}: перезагрузка не подтверждена. Включите switch «Разрешить перезагрузку» и повторите в течение окна подтверждения."
+    },
+    "agent_token_missing": {
+      "title": "Агент без токена",
+      "description": "Сервер {server_id} ({host}): агент установлен без токена. Опасные операции запрещены (fail-closed). Переустановите агента через Options → «Установить агента», чтобы выдать токен."
     }
   }
 }

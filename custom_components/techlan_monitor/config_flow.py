@@ -21,9 +21,14 @@ from .const import (
     CONF_AGENT_INSTALLED,
     CONF_PLATFORM,
     CONF_PORT,
+    CONF_REBOOT_CONFIRM_SECONDS,
     CONF_SERVERS,
     CONF_TOKEN,
+    CONF_USE_HTTPS,
+    CONF_VERIFY_TLS,
+    CONFIG_MINOR_VERSION,
     DEFAULT_AGENT_PORT,
+    DEFAULT_REBOOT_CONFIRM_SECONDS,
     DOMAIN,
     PLATFORM_LINUX,
     PLATFORM_WINDOWS,
@@ -36,6 +41,7 @@ class TechlanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow для Techlan Monitor."""
 
     VERSION = 1
+    MINOR_VERSION = CONFIG_MINOR_VERSION
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -74,10 +80,43 @@ class TechlanOptionsFlow(OptionsFlow):
             menu_options.append("remove_server")
             menu_options.append("list_servers")
         menu_options.append("install_agent")
+        menu_options.append("settings")
 
         return self.async_show_menu(
             step_id="init",
             menu_options=menu_options,
+        )
+
+    async def async_step_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Общие настройки (окно подтверждения перезагрузки)."""
+        servers = self._get_servers()
+        if user_input is not None:
+            seconds = int(
+                user_input.get(
+                    CONF_REBOOT_CONFIRM_SECONDS, DEFAULT_REBOOT_CONFIRM_SECONDS
+                )
+            )
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_SERVERS: servers,
+                    CONF_REBOOT_CONFIRM_SECONDS: max(5, seconds),
+                },
+            )
+        current = self.config_entry.options.get(
+            CONF_REBOOT_CONFIRM_SECONDS, DEFAULT_REBOOT_CONFIRM_SECONDS
+        )
+        return self.async_show_form(
+            step_id="settings",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_REBOOT_CONFIRM_SECONDS, default=int(current)
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=3600)),
+                }
+            ),
         )
 
     async def async_step_add_server(
@@ -104,6 +143,8 @@ class TechlanOptionsFlow(OptionsFlow):
                 CONF_USERNAME: ssh_user,
                 CONF_PASSWORD: ssh_pass,
                 CONF_AGENT_INSTALLED: False,
+                CONF_USE_HTTPS: bool(user_input.get(CONF_USE_HTTPS, False)),
+                CONF_VERIFY_TLS: bool(user_input.get(CONF_VERIFY_TLS, True)),
             }
 
             return self._save_and_finish(servers)
@@ -133,6 +174,8 @@ class TechlanOptionsFlow(OptionsFlow):
                     vol.Optional(CONF_PASSWORD, default=""): TextSelector(
                         TextSelectorConfig(type=TextSelectorType.PASSWORD)
                     ),
+                    vol.Optional(CONF_USE_HTTPS, default=False): bool,
+                    vol.Optional(CONF_VERIFY_TLS, default=True): bool,
                 }
             ),
         )
@@ -196,28 +239,31 @@ class TechlanOptionsFlow(OptionsFlow):
             return self.async_abort(reason="all_agents_installed")
 
         if user_input is not None:
+            if not user_input.get("confirm"):
+                return self.async_abort(reason="install_not_confirmed")
             server_id = user_input["server_id"]
             info = servers.get(server_id)
             if info:
-                success = await self._install_agent_via_ssh(info)
-                if success:
+                token = await self._install_agent_via_ssh(info)
+                if token:
                     info[CONF_AGENT_INSTALLED] = True
+                    info[CONF_TOKEN] = token
                     servers[server_id] = info
                     return self._save_and_finish(servers)
-                else:
-                    return self.async_abort(reason="install_failed")
+                return self.async_abort(reason="install_failed")
 
         return self.async_show_form(
             step_id="install_agent",
             data_schema=vol.Schema(
                 {
                     vol.Required("server_id"): vol.In(list(uninstalled.keys())),
+                    vol.Required("confirm", default=False): bool,
                 }
             ),
         )
 
-    async def _install_agent_via_ssh(self, info: dict[str, Any]) -> bool:
-        """Установка агента через SSH."""
+    async def _install_agent_via_ssh(self, info: dict[str, Any]) -> str | None:
+        """Установка агента через SSH; возвращает выданный токен."""
         host = info.get(CONF_HOST, "")
         ssh_user = info.get(CONF_USERNAME, "root")
         ssh_pass = info.get(CONF_PASSWORD, "")
@@ -226,7 +272,7 @@ class TechlanOptionsFlow(OptionsFlow):
 
         if not host or not ssh_user:
             _LOGGER.error("SSH credentials not configured for %s", host)
-            return False
+            return None
 
         try:
             from .installer import install_agent
@@ -238,10 +284,11 @@ class TechlanOptionsFlow(OptionsFlow):
                 password=ssh_pass,
                 port=port,
                 platform=platform,
+                token=info.get(CONF_TOKEN) or None,
             )
         except Exception as err:
             _LOGGER.exception("Agent install failed for %s: %s", host, err)
-            return False
+            return None
 
     # ─── helpers ──────────────────────────────────────────────────────
 
@@ -250,8 +297,10 @@ class TechlanOptionsFlow(OptionsFlow):
         return dict(self.config_entry.options.get(CONF_SERVERS, {}))
 
     def _save_and_finish(self, servers: dict[str, Any]) -> FlowResult:
-        """Сохранить options и завершить."""
-        return self.async_create_entry(
-            title="",
-            data={CONF_SERVERS: servers},
-        )
+        """Сохранить options (сохраняя общие скаляры) и завершить."""
+        data: dict[str, Any] = {CONF_SERVERS: servers}
+        if CONF_REBOOT_CONFIRM_SECONDS in self.config_entry.options:
+            data[CONF_REBOOT_CONFIRM_SECONDS] = self.config_entry.options[
+                CONF_REBOOT_CONFIRM_SECONDS
+            ]
+        return self.async_create_entry(title="", data=data)

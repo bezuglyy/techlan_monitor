@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -19,15 +20,24 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.issue_registry import (
+    IssueSeverity,
+    async_create_issue,
+    async_delete_issue,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_AGENT_INSTALLED,
     CONF_PLATFORM,
     CONF_PORT,
+    CONF_REBOOT_CONFIRM_SECONDS,
     CONF_SERVERS,
     CONF_TOKEN,
+    CONF_USE_HTTPS,
+    CONF_VERIFY_TLS,
     DEFAULT_AGENT_PORT,
+    DEFAULT_REBOOT_CONFIRM_SECONDS,
     DOMAIN,
     HTTP_TIMEOUT,
     PLATFORM_LINUX,
@@ -46,6 +56,7 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=SCAN_INTERVAL,
             always_update=False,
@@ -57,6 +68,10 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.haos_hostname: str = ""
         self.haos_version: str = ""
         self.haos_device_id: str | None = None
+        self._haos_failures = 0
+        self._haos_issue_active = False
+        # Предохранители перезагрузки: ключ → monotonic-время истечения.
+        self._reboot_armed: dict[str, float] = {}
 
         # Загружаем конфигурацию серверов из options
         self._load_config(entry)
@@ -65,11 +80,55 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Загрузка конфигурации серверов."""
         self.entry = entry
         self.server_configs = dict(entry.options.get(CONF_SERVERS, {}))
+        try:
+            self.reboot_confirm_seconds = max(
+                5,
+                int(
+                    entry.options.get(
+                        CONF_REBOOT_CONFIRM_SECONDS, DEFAULT_REBOOT_CONFIRM_SECONDS
+                    )
+                ),
+            )
+        except (TypeError, ValueError):
+            self.reboot_confirm_seconds = DEFAULT_REBOOT_CONFIRM_SECONDS
         _LOGGER.debug(
             "Loaded %d server configs: %s",
             len(self.server_configs),
             list(self.server_configs.keys()),
         )
+
+    # ─── Предохранитель перезагрузки (двухшаговое подтверждение) ──────
+
+    def arm_reboot(self, key: str) -> None:
+        """Arm the reboot interlock for a limited time window."""
+        self._reboot_armed[key] = time.monotonic() + self.reboot_confirm_seconds
+        self.async_update_listeners()
+
+    def disarm_reboot(self, key: str) -> None:
+        """Disarm the reboot interlock immediately."""
+        self._reboot_armed.pop(key, None)
+        self.async_update_listeners()
+
+    def is_reboot_armed(self, key: str) -> bool:
+        """Return True while the interlock window is still open."""
+        until = self._reboot_armed.get(key)
+        if not until:
+            return False
+        if time.monotonic() >= until:
+            self._reboot_armed.pop(key, None)
+            return False
+        return True
+
+    def reboot_armed_remaining(self, key: str) -> int:
+        """Seconds left in the interlock window (0 when disarmed)."""
+        until = self._reboot_armed.get(key)
+        if not until:
+            return 0
+        remaining = int(until - time.monotonic())
+        if remaining <= 0:
+            self._reboot_armed.pop(key, None)
+            return 0
+        return remaining
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Обновление всех данных."""
@@ -85,10 +144,12 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["haos"] = haos_data
             self.haos_hostname = haos_data.get("hostname", "")
             self.haos_version = haos_data.get("version", "")
+            self._note_haos(ok=True, error="")
         except Exception as err:
             msg = f"HAOS fetch failed: {err}"
             _LOGGER.warning(msg)
             data["errors"].append(msg)
+            self._note_haos(ok=False, error=str(err))
             # Используем последние известные данные
             if self.data:
                 data["haos"] = self.data.get("haos", {})
@@ -118,6 +179,33 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     data["servers"][server_id] = result
 
         return data
+
+    # ─── Repairs (issues) ─────────────────────────────────────────────
+
+    @property
+    def _haos_issue_id(self) -> str:
+        return f"haos_unreachable_{self._entry_id}"
+
+    def _note_haos(self, *, ok: bool, error: str) -> None:
+        """Raise/clear a Repair when the Supervisor API stays unreachable."""
+        if ok:
+            self._haos_failures = 0
+            if self._haos_issue_active:
+                async_delete_issue(self.hass, DOMAIN, self._haos_issue_id)
+                self._haos_issue_active = False
+            return
+        self._haos_failures += 1
+        if self._haos_failures >= 2 and not self._haos_issue_active:
+            async_create_issue(
+                self.hass,
+                DOMAIN,
+                self._haos_issue_id,
+                is_fixable=False,
+                severity=IssueSeverity.WARNING,
+                translation_key="haos_unreachable",
+                translation_placeholders={"error": error},
+            )
+            self._haos_issue_active = True
 
     # ─── Supervisor API ───────────────────────────────────────────────
 
@@ -230,17 +318,23 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         host = config.get(CONF_HOST, "")
         port = config.get(CONF_PORT, DEFAULT_AGENT_PORT)
         token = config.get(CONF_TOKEN, "")
-        platform = config.get(CONF_PLATFORM, PLATFORM_LINUX)
+        use_https = bool(config.get(CONF_USE_HTTPS, False))
+        verify_tls = bool(config.get(CONF_VERIFY_TLS, True))
 
-        url = f"http://{host}:{port}/api/v1/metrics"
+        scheme = "https" if use_https else "http"
+        url = f"{scheme}://{host}:{port}/api/v1/metrics"
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        # ssl=False disables certificate verification (self-signed agents);
+        # it is only meaningful for HTTPS.
+        ssl_param = False if (use_https and not verify_tls) else None
 
         try:
             async with self.session.get(
                 url,
                 headers=headers,
+                ssl=ssl_param,
                 timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT),
             ) as resp:
                 if resp.status != 200:
@@ -263,18 +357,25 @@ class TechlanDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         host = config.get(CONF_HOST, "")
         port = config.get(CONF_PORT, DEFAULT_AGENT_PORT)
         token = config.get(CONF_TOKEN, "")
+        use_https = bool(config.get(CONF_USE_HTTPS, False))
+        verify_tls = bool(config.get(CONF_VERIFY_TLS, True))
 
-        url = f"http://{host}:{port}/api/v1/reboot"
+        scheme = "https" if use_https else "http"
+        url = f"{scheme}://{host}:{port}/api/v1/reboot"
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        ssl_param = False if (use_https and not verify_tls) else None
 
         try:
             async with self.session.post(
-                url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)
+                url,
+                headers=headers,
+                ssl=ssl_param,
+                timeout=aiohttp.ClientTimeout(total=10),
             ) as resp:
                 return resp.status == 200
-        except Exception:
+        except Exception:  # noqa: BLE001 - reboot is fire-and-forget
             return False
 
     async def async_reload_config(self, entry: ConfigEntry | None = None) -> None:

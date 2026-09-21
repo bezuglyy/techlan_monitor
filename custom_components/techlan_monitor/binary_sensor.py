@@ -13,9 +13,10 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from ._shared.shared_entities import build_device_info
 
 from .const import (
     CONF_HOST,
@@ -73,11 +74,12 @@ class TechlanServerBinarySensor(
         self._entry = entry
         hostname = config.get(CONF_HOST, "unknown")
         self._attr_unique_id = f"{entry.entry_id}_{server_id}_{sensor_key}"
-        self._attr_device_info = DeviceInfo(
+        self._attr_device_info = build_device_info(
             identifiers={(DOMAIN, server_id)},
             name=config.get(CONF_NAME, hostname),
             model=config.get(CONF_PLATFORM, "linux").capitalize(),
             manufacturer="Techlan",
+            via_device_id=self.coordinator.haos_device_id,
             via_device=(DOMAIN, "haos"),
         )
 

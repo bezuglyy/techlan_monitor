@@ -1,7 +1,7 @@
 {
   "domain": "techlan_monitor",
   "name": "Techlan Monitor",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "requirements": [
     "asyncssh>=2.14.0"
   ],
@@ -14,6 +14,7 @@
   "integration_type": "hub",
   "documentation": "https://github.com/bezuglyy/techlan_monitor",
   "issue_tracker": "https://github.com/bezuglyy/techlan_monitor/issues",
+  "quality_scale": "bronze",
   "loggers": [
     "custom_components.techlan_monitor"
   ]

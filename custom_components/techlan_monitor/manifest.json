@@ -1,7 +1,7 @@
 {
   "domain": "techlan_monitor",
   "name": "Techlan Monitor",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "requirements": [
     "asyncssh>=2.14.0"
   ],

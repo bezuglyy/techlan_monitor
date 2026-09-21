@@ -20,7 +20,7 @@ from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
 DOMAIN: Final = "techlan_monitor"
-VERSION: Final = "1.2.2"
+VERSION: Final = "1.2.3"
 
 # Версия схемы config entry (minor обновляется при миграциях).
 CONFIG_MINOR_VERSION: Final = 3

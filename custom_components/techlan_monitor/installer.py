@@ -14,6 +14,11 @@ import secrets
 from pathlib import Path
 from typing import Any
 
+try:  # импорт на этапе загрузки модуля (HA грузит интеграции в executor)
+    import asyncssh
+except ImportError:  # pragma: no cover - зависимость объявлена в manifest
+    asyncssh = None  # type: ignore[assignment]
+
 _LOGGER = logging.getLogger(__name__)
 
 # Версия устанавливаемого агента (артефакт agent/agent.py должен совпадать).
@@ -28,12 +33,22 @@ WINDOWS_TOKEN_FILE = r"C:\ProgramData\TechlanAgent\agent.token"
 AGENT_SOURCE = Path(__file__).resolve().parent / "agent" / "agent.py"
 
 
-def _agent_code() -> str:
-    """Исходник агента для установки (единый артефакт ``agent/agent.py``)."""
+def _read_agent_source() -> str:
+    """Прочитать исходник агента (вызывается при импорте модуля, вне event loop)."""
     try:
         return AGENT_SOURCE.read_text(encoding="utf-8")
-    except OSError as err:  # pragma: no cover - защита поставки
-        raise RuntimeError(f"agent source not found: {AGENT_SOURCE}") from err
+    except OSError:  # pragma: no cover - защита поставки
+        return ""
+
+
+_AGENT_CODE: str = _read_agent_source()
+
+
+def _agent_code() -> str:
+    """Исходник агента для установки (единый артефакт ``agent/agent.py``)."""
+    if not _AGENT_CODE:
+        raise RuntimeError(f"agent source not found: {AGENT_SOURCE}")
+    return _AGENT_CODE
 
 
 
@@ -52,10 +67,8 @@ async def install_agent(
     token: str | None = None,
 ) -> str | None:
     """Install the agent and return its token (``None`` on failure)."""
-    try:
-        import asyncssh
-    except ImportError:
-        _LOGGER.error("asyncssh not installed. Install with: pip install asyncssh")
+    if asyncssh is None:
+        _LOGGER.error("asyncssh is not installed (pip install asyncssh)")
         return None
 
     agent_token = token or generate_token()

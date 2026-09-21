@@ -17,6 +17,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .installer import install_agent
 from .const import (
     CONF_AGENT_INSTALLED,
     CONF_PLATFORM,
@@ -275,8 +276,6 @@ class TechlanOptionsFlow(OptionsFlow):
             return None
 
         try:
-            from .installer import install_agent
-
             return await install_agent(
                 self.hass,
                 host=host,

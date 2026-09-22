@@ -1,11 +1,11 @@
 # SecurARM Monitor
 ![Release](https://img.shields.io/github/v/release/bezuglyy/techlan_monitor?label=Release&style=flat-square) ![HACS](https://img.shields.io/badge/HACS-Custom%20Repository-purple?style=flat-square) ![License](https://img.shields.io/github/license/bezuglyy/techlan_monitor?style=flat-square) ![HA](https://img.shields.io/badge/HA-2025.1%2B-2ea44f?style=flat-square)
-Кастомная интеграция для [Home Assistant](https://www.home-assistant.io) · версия **1.2.4**.
+Кастомная интеграция для [Home Assistant](https://www.home-assistant.io) · версия **1.2.5**.
 ![icon](custom_components/techlan_monitor/brand/icon.png)
 | | |
 |---|---|
 | Домен | `techlan_monitor` |
-| Версия | 1.2.4 |
+| Версия | 1.2.5 |
 | Тип | custom integration |
 ## Описание
 Мониторинг серверов и устройств techlan.su.
@@ -13,6 +13,8 @@
 - Бинарные датчики (движение, контакты и т.п.)
 - Кнопки и действия
 - Сенсоры и мониторинг состояния
+### Изменения 1.2.5
+- 🖼️ **Фирменный знак SecurARM** (щит с шестернёй и замком, логотип автора) в `brand/` — icon/logo + тёмные варианты и `@2x`.
 ### Изменения 1.2.4
 - 🏷️ **Переименование в SecurARM:** отображаемое имя интеграции — **SecurARM Monitor**, логотипы/иконки обновлены (`brand/`, вордмарк **SECURARM**).
 - ⚠️ Домен `techlan_monitor`, `unique_id` и все `entity_id` **не изменены**; имя агента на хостах (`TechlanAgent`) также не менялось.

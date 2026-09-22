@@ -1,7 +1,7 @@
 {
   "domain": "techlan_monitor",
   "name": "SecurARM Monitor",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "requirements": [
     "asyncssh>=2.14.0"
   ],

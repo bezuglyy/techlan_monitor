@@ -25,9 +25,13 @@ CONF_HUMIDITY_OFFSET: Final = "humidity_offset"
 CONF_TEMPERATURE_ALARM_LOW: Final = "temperature_alarm_low"
 CONF_TEMPERATURE_ALARM_HIGH: Final = "temperature_alarm_high"
 CONF_COMMAND_TIMEOUT: Final = "command_timeout"
+CONF_SELECTED_RELAYS: Final = "selected_relays"
+CONF_RELAY_TIME: Final = "relay_time"
+CONF_RELAY_PROGRAM: Final = "relay_program"
 CONFIRM: Final = "confirm"
 
 ATTR_PKU: Final = "pku"
+ATTR_RELAY: Final = "relay"
 
 # --- Значения по умолчанию ---
 DEFAULT_BASE_URL: Final = "http://192.168.100.111:18081"
@@ -130,3 +134,65 @@ STATE_NAMES: Final = {
     206: "Температура ниже заданного значения",
     218: "RS-485 в норме",
 }
+
+# --- Реле (управляемые выходы ServerSkif) -----------------------------------
+#
+# Реле адресуется парой (pku, rl), где rl = (device << 8) | relay_number.
+# Протокол (канон — вендорский клиент arm-skif 2.16.0, WebSocket/script/armSkif/main.js):
+#   getListDevices {pku}                  -> [dev, ...]
+#   getListRelay   {pku, req: dev}        -> [rl, ...]
+#   getRelayDescription {pku, req: [rl]}  -> [str, ...]
+#   getRelayState  {pku, req: [rl]}       -> [1|2|3, ...]
+#   controlRelay_Inv {pku, rl}            -> переключить реле
+#   controlRelay {pku, rl, prog[, mask, delay, time]} -> задать программу
+# Команда отправляется только вместе с пакетом userId (см. send_command_sync).
+
+# Коды состояний реле (arrRelayState вендора; 0 = нет данных).
+RELAY_STATE_UNKNOWN: Final = 0
+RELAY_STATE_ON: Final = 1
+RELAY_STATE_OFF: Final = 2
+RELAY_STATE_BLINK: Final = 3
+
+# Тексты состояний реле.
+RELAY_STATE_NAMES: Final = {
+    0: "Нет данных",
+    1: "Включено",
+    2: "Выключено",
+    3: "Мигает",
+}
+
+# Коды программ (RL_* в вендоре).
+RELAY_PROGRAM_RESET: Final = 0
+RELAY_PROGRAM_ON: Final = 1
+RELAY_PROGRAM_OFF: Final = 2
+RELAY_PROGRAM_ON_TIME: Final = 3
+RELAY_PROGRAM_OFF_TIME: Final = 4
+RELAY_PROGRAM_BLINK_OFF: Final = 5
+RELAY_PROGRAM_BLINK_ON: Final = 6
+RELAY_PROGRAM_BLINK_OFF_TIME: Final = 7
+RELAY_PROGRAM_BLINK_ON_TIME: Final = 8
+
+# Человекочитаемое имя программы -> код RL_*.
+RELAY_PROGRAMS: Final = {
+    "reset": RELAY_PROGRAM_RESET,
+    "on": RELAY_PROGRAM_ON,
+    "off": RELAY_PROGRAM_OFF,
+    "on_time": RELAY_PROGRAM_ON_TIME,
+    "off_time": RELAY_PROGRAM_OFF_TIME,
+    "blink_off": RELAY_PROGRAM_BLINK_OFF,
+    "blink_on": RELAY_PROGRAM_BLINK_ON,
+    "blink_off_time": RELAY_PROGRAM_BLINK_OFF_TIME,
+    "blink_on_time": RELAY_PROGRAM_BLINK_ON_TIME,
+}
+
+# Программы, требующие параметр времени (секунды).
+RELAY_TIME_PROGRAMS: Final = frozenset(
+    {"on_time", "off_time", "blink_off_time", "blink_on_time"}
+)
+
+# Одна единица поля ``time`` в протоколе = 0.125 c (вендор: rlTime / 0.125).
+RELAY_TIME_UNIT_SECONDS: Final = 0.125
+
+# Программа по умолчанию и время по умолчанию для *_TIME.
+DEFAULT_RELAY_PROGRAM: Final = "on"
+DEFAULT_RELAY_TIME: Final = 3.0

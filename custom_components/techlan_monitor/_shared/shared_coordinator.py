@@ -51,12 +51,14 @@ class TechlanBaseCoordinator(DataUpdateCoordinator[dict]):
         client: Any,
         scan_interval: int,
         selected_loops: list[str] | None = None,
+        selected_relays: list[str] | None = None,
         effective_options: dict[str, Any] | None = None,
         emit_events: bool = False,
     ) -> None:
         self.entry = entry
         self.client = client
         self.selected_loops = selected_loops
+        self.selected_relays = selected_relays
         self.options = dict(effective_options or {})
         self.emit_events = emit_events
         # Заполняются интеграцией после регистрации родительского устройства.
@@ -91,7 +93,14 @@ class TechlanBaseCoordinator(DataUpdateCoordinator[dict]):
 
     async def _async_update_data(self) -> dict:
         try:
-            snapshot = await self.client.async_fetch_snapshot(self.selected_loops)
+            # ``selected_relays`` поддерживает только клиент techlan_sensor;
+            # остальные интеграции получают прежнюю сигнатуру вызова.
+            extra: dict[str, Any] = {}
+            if self.selected_relays is not None:
+                extra["selected_relays"] = self.selected_relays
+            snapshot = await self.client.async_fetch_snapshot(
+                self.selected_loops, **extra
+            )
         except TechlanApiError as exc:
             self._failure_count += 1
             if self._failure_count >= self.FAILURE_THRESHOLD:

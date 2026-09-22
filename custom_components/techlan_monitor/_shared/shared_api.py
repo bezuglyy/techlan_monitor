@@ -39,6 +39,11 @@ from urllib.parse import urlparse, urlunparse
 
 import websocket
 
+try:  # пакетный импорт (Home Assistant)
+    from .shared_const import RELAY_TIME_UNIT_SECONDS
+except ImportError:  # модуль загружается как top-level (stdlib-тесты)
+    from shared_const import RELAY_TIME_UNIT_SECONDS  # type: ignore[no-redef]
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -155,6 +160,48 @@ def format_loop_label(pku: int, part: int, sh: int, description: str | None) -> 
         f"ШС {int(sh) >> 8}/{int(sh) & 0xFF} — "
         f"{description or 'Без названия'}"
     )
+
+
+# --- реле (управляемые выходы) ----------------------------------------------
+
+
+def relay_key(pku: int, rl: int) -> str:
+    """Canonical ``pku:rl`` relay key used in config options."""
+    return f"{int(pku)}:{int(rl)}"
+
+
+def parse_relay_keys(selected_relays: list[str] | None) -> set[tuple[int, int]]:
+    """Parse ``['pku:rl', ...]`` into a set of ``(pku, rl)`` tuples."""
+    result: set[tuple[int, int]] = set()
+    for item in selected_relays or []:
+        parts = str(item).split(":")
+        if len(parts) != 2:
+            continue
+        try:
+            result.add((int(parts[0]), int(parts[1])))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def decode_relay(rl: int) -> tuple[int, int]:
+    """Split a relay id into ``(device, relay_number)`` (``rl = dev<<8 | num``)."""
+    value = int(rl)
+    return value >> 8, value & 0xFF
+
+
+def format_relay_label(pku: int, rl: int, description: str | None) -> str:
+    """Human-readable label for the HA relay selector."""
+    device, number = decode_relay(rl)
+    return (
+        f"ПКУ {pku} · прибор {device} · реле {number} — {description or 'Без названия'}"
+    )
+
+
+def relay_time_units(seconds: float) -> int:
+    """Convert seconds into protocol ``time`` units (1 unit = 0.125 c)."""
+    units = float(seconds) / RELAY_TIME_UNIT_SECONDS
+    return max(0, int(round(units)))
 
 
 def _default_transport(url: str, timeout: float) -> Any:

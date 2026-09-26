@@ -1,7 +1,7 @@
 # techlan-agent — артефакт мониторинга
 
 Автономный HTTP-агент для удалённых серверов (Linux/Windows), который
-опрашивает интеграция `techlan_monitor`.
+опрашивает интеграция `securarm_monitor`.
 
 | Параметр | Значение |
 |---|---|
@@ -42,7 +42,7 @@
 
 ## Установка
 
-Автоматически: `techlan_monitor` → Настройки → Options → «Установить агента»
+Автоматически: `securarm_monitor` → Настройки → Options → «Установить агента»
 (SSH, требуется пользователь/пароль). Скрипт установки — `installer.py`
 (Linux: `/opt/techlan-agent/agent.py` + `agent.token` + systemd; Windows:
 `C:\ProgramData\TechlanAgent` + Scheduled Task).

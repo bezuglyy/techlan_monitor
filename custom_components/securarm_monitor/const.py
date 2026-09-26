@@ -1,4 +1,4 @@
-"""Константы интеграции techlan_monitor."""
+"""Константы интеграции securarm_monitor."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ from homeassistant.components.button import ButtonEntityDescription
 from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 
-DOMAIN: Final = "techlan_monitor"
-VERSION: Final = "1.2.5"
+DOMAIN: Final = "securarm_monitor"
+VERSION: Final = "2.0.0"
 
 # Версия схемы config entry (minor обновляется при миграциях).
 CONFIG_MINOR_VERSION: Final = 3

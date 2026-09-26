@@ -1,7 +1,7 @@
 {
-  "domain": "techlan_monitor",
+  "domain": "securarm_monitor",
   "name": "SecurARM Monitor",
-  "version": "1.2.5",
+  "version": "2.0.0",
   "requirements": [
     "asyncssh>=2.14.0"
   ],
@@ -12,10 +12,10 @@
   "config_flow": true,
   "iot_class": "local_polling",
   "integration_type": "hub",
-  "documentation": "https://github.com/bezuglyy/techlan_monitor",
-  "issue_tracker": "https://github.com/bezuglyy/techlan_monitor/issues",
+  "documentation": "https://github.com/bezuglyy/securarm_monitor",
+  "issue_tracker": "https://github.com/bezuglyy/securarm_monitor/issues",
   "quality_scale": "bronze",
   "loggers": [
-    "custom_components.techlan_monitor"
+    "custom_components.securarm_monitor"
   ]
 }

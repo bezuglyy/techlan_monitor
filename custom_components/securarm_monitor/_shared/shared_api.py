@@ -1,7 +1,7 @@
 """Общий WebSocket-клиент ServerSkif через прокси ARM (канонический источник).
 
-Копируется в ``techlan_ops/_shared/shared_api.py`` и
-``techlan_sensor/_shared/shared_api.py`` скриптом ``tools/sync-ha-shared.py``.
+Копируется в ``securarm/_shared/shared_api.py`` и
+``securarm_sensor/_shared/shared_api.py`` скриптом ``tools/sync-ha-shared.py``.
 Не редактировать копии вручную.
 
 Слой не зависит от Home Assistant, поэтому его чистые функции и логика
@@ -40,9 +40,19 @@ from urllib.parse import urlparse, urlunparse
 import websocket
 
 try:  # пакетный импорт (Home Assistant)
-    from .shared_const import RELAY_TIME_UNIT_SECONDS
+    from .shared_const import (
+        READER_STATE_ENTRY_LOCKED,
+        READER_STATE_EXIT_LOCKED,
+        READER_STATE_FREE,
+        RELAY_TIME_UNIT_SECONDS,
+    )
 except ImportError:  # модуль загружается как top-level (stdlib-тесты)
-    from shared_const import RELAY_TIME_UNIT_SECONDS  # type: ignore[no-redef]
+    from shared_const import (  # type: ignore[no-redef]
+        READER_STATE_ENTRY_LOCKED,
+        READER_STATE_EXIT_LOCKED,
+        READER_STATE_FREE,
+        RELAY_TIME_UNIT_SECONDS,
+    )
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -202,6 +212,90 @@ def relay_time_units(seconds: float) -> int:
     """Convert seconds into protocol ``time`` units (1 unit = 0.125 c)."""
     units = float(seconds) / RELAY_TIME_UNIT_SECONDS
     return max(0, int(round(units)))
+
+
+# --- считыватели (контроллеры доступа) ---------------------------------------
+
+
+def reader_key(pku: int, rd: int) -> str:
+    """Canonical ``pku:rd`` reader key used in config options."""
+    return f"{int(pku)}:{int(rd)}"
+
+
+def parse_reader_keys(selected_readers: list[str] | None) -> set[tuple[int, int]]:
+    """Parse ``['pku:rd', ...]`` into a set of ``(pku, rd)`` tuples."""
+    result: set[tuple[int, int]] = set()
+    for item in selected_readers or []:
+        parts = str(item).split(":")
+        if len(parts) != 2:
+            continue
+        try:
+            result.add((int(parts[0]), int(parts[1])))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def decode_reader(rd: int) -> tuple[int, int]:
+    """Split a reader id into ``(device, reader_number)`` (``rd = dev<<8 | num``)."""
+    value = int(rd)
+    return value >> 8, value & 0xFF
+
+
+def format_reader_label(
+    pku: int,
+    rd: int,
+    description: str | None,
+    device_description: str | None = None,
+    device_type: str | None = None,
+) -> str:
+    """Human-readable label for the HA reader selector.
+
+    ``device_description``/``device_type`` (необязательно) добавляют имя прибора
+    и его тип — так «Ворота КБИ» и другие контроллеры доступа видно в списке.
+    """
+    device, number = decode_reader(rd)
+    device_part = f"прибор {device}"
+    if device_description:
+        device_part += f" «{device_description}»"
+    if device_type:
+        device_part += f" ({device_type})"
+    return (
+        f"ПКУ {pku} · {device_part} · считыватель {number} — "
+        f"{description or 'Без названия'}"
+    )
+
+
+def reader_state_flags(state: Any) -> dict[str, bool]:
+    """Decode the ``getReaderState`` bitmask into named flags.
+
+    Бит 0 — запрет выхода (по кнопке), бит 1 — запрет входа, бит 2 — свободный
+    проход. Неизвестное значение (``None``) даёт все флаги ``False``.
+    """
+    try:
+        value = int(state)
+    except (TypeError, ValueError):
+        value = 0
+    return {
+        "exit_locked": bool(value & READER_STATE_EXIT_LOCKED),
+        "entry_locked": bool(value & READER_STATE_ENTRY_LOCKED),
+        "free": bool(value & READER_STATE_FREE),
+    }
+
+
+def reader_state_text(state: Any) -> str:
+    """Human-readable reader state (для sensor-сущности)."""
+    flags = reader_state_flags(state)
+    if flags["free"]:
+        return "Доступ открыт (свободный проход)"
+    locked = []
+    if flags["entry_locked"]:
+        locked.append("входа")
+    if flags["exit_locked"]:
+        locked.append("выхода")
+    if locked:
+        return "Запрет доступа (" + ", ".join(locked) + ")"
+    return "Доступ разрешён"
 
 
 def _default_transport(url: str, timeout: float) -> Any:

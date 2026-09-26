@@ -1,4 +1,4 @@
-"""Общий слой интеграций techlan_ops / techlan_sensor / techlan_monitor.
+"""Общий слой интеграций securarm / securarm_sensor / securarm_monitor.
 
 **Единственный источник правды** для кода, общего между интеграциями
 ARM/ОПС. Файлы этого пакета побайтово копируются в ``<_integration>/_shared``

@@ -1,7 +1,7 @@
 """Общие константы интеграций Techlan ARM/ОПС (канонический источник).
 
-Копируется в ``techlan_ops/_shared/shared_const.py`` и
-``techlan_sensor/_shared/shared_const.py`` скриптом ``tools/sync-ha-shared.py``.
+Копируется в ``securarm/_shared/shared_const.py`` и
+``securarm_sensor/_shared/shared_const.py`` скриптом ``tools/sync-ha-shared.py``.
 Не редактировать копии вручную.
 """
 
@@ -26,12 +26,14 @@ CONF_TEMPERATURE_ALARM_LOW: Final = "temperature_alarm_low"
 CONF_TEMPERATURE_ALARM_HIGH: Final = "temperature_alarm_high"
 CONF_COMMAND_TIMEOUT: Final = "command_timeout"
 CONF_SELECTED_RELAYS: Final = "selected_relays"
+CONF_SELECTED_READERS: Final = "selected_readers"
 CONF_RELAY_TIME: Final = "relay_time"
 CONF_RELAY_PROGRAM: Final = "relay_program"
 CONFIRM: Final = "confirm"
 
 ATTR_PKU: Final = "pku"
 ATTR_RELAY: Final = "relay"
+ATTR_READER: Final = "reader"
 
 # --- Значения по умолчанию ---
 DEFAULT_BASE_URL: Final = "http://192.168.100.111:18081"
@@ -196,3 +198,62 @@ RELAY_TIME_UNIT_SECONDS: Final = 0.125
 # Программа по умолчанию и время по умолчанию для *_TIME.
 DEFAULT_RELAY_PROGRAM: Final = "on"
 DEFAULT_RELAY_TIME: Final = 3.0
+
+
+# --- Считыватели (контроллеры доступа, напр. С2000-2) ------------------------
+#
+# Считыватель адресуется парой (pku, rd), где rd = (device << 8) | reader_number.
+# Протокол (канон — вендорский arm-skif 2.16.0, Application_A.pdf Табл. А.4):
+#   getListReader      {pku, req: dev}      -> [rd, ...]
+#   getReaderDescription {pku, req: [rd]}   -> [str, ...]
+#   getReaderState     {pku, req: [rd]}     -> [битовая маска, ...]
+#   controlReader      {pku, rd, prog}      -> программа управления считывателем
+#
+# Зачем: у контроллеров ДОСТУПА (С2000-2) реле — это «замки», управляемые
+# только логикой доступа (в РЭ только программы 3/4 «включить/выключить на
+# время»), внешнее управление реле прибором не поддерживается. Правильный путь
+# — управлять считывателем: РЭ прямо указывает, что режим «Доступ открыт»
+# включается «по команде сетевого контроллера по интерфейсу RS-485».
+# Команда отправляется только вместе с пакетом userId (см. async_send_command).
+
+# Биты состояния считывателя (getReaderState).
+READER_STATE_EXIT_LOCKED: Final = 1  # бит 0 — запрет выхода (по кнопке)
+READER_STATE_ENTRY_LOCKED: Final = 2  # бит 1 — запрет входа
+READER_STATE_FREE: Final = 4  # бит 2 — свободный проход
+
+# Коды программ (RD_* в вендоре, Табл. А.4).
+READER_PROGRAM_OPEN: Final = 0  # RD_OPEN — предоставление доступа (разово)
+READER_PROGRAM_NORMAL: Final = 1  # RD_NORMAL — разрешение доступа (норма)
+READER_PROGRAM_UNLOCK_READER: Final = 2  # RD_UNLOCK_RD — разблокировать считыватель
+READER_PROGRAM_UNLOCK_BUTTON: Final = 3  # RD_UNLOCK_BTN — разблокировать кнопку «Выход»
+READER_PROGRAM_LOCK: Final = 4  # RD_LOCK — запрет доступа
+READER_PROGRAM_LOCK_READER: Final = 5  # RD_LOCK_RD — заблокировать считыватель
+READER_PROGRAM_LOCK_BUTTON: Final = 6  # RD_LOCK_BTN — заблокировать кнопку «Выход»
+READER_PROGRAM_FREE: Final = 7  # RD_UNLOCK — открытие свободного доступа
+
+# Человекочитаемое имя программы -> код RD_*.
+READER_PROGRAMS: Final = {
+    "open": READER_PROGRAM_OPEN,
+    "normal": READER_PROGRAM_NORMAL,
+    "unlock_reader": READER_PROGRAM_UNLOCK_READER,
+    "unlock_button": READER_PROGRAM_UNLOCK_BUTTON,
+    "lock": READER_PROGRAM_LOCK,
+    "lock_reader": READER_PROGRAM_LOCK_READER,
+    "lock_button": READER_PROGRAM_LOCK_BUTTON,
+    "free": READER_PROGRAM_FREE,
+}
+
+# Подписи программ (для select/справки).
+READER_PROGRAM_NAMES: Final = {
+    "open": "Предоставление доступа",
+    "normal": "Разрешение доступа",
+    "unlock_reader": "Разблокировать считыватель",
+    "unlock_button": "Разблокировать кнопку «Выход»",
+    "lock": "Запрет доступа",
+    "lock_reader": "Заблокировать считыватель",
+    "lock_button": "Заблокировать кнопку «Выход»",
+    "free": "Открытие свободного доступа",
+}
+
+# Программа по умолчанию (моментальное открытие доступа).
+DEFAULT_READER_PROGRAM: Final = "open"

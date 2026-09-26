@@ -1,3 +1,7 @@
+# SecurARM Monitor — интеграция Home Assistant (мониторинг хостов)
+
+> **Изменения 2.0.0 (26.09.2026):** домен переименован `techlan_monitor` → **`securarm_monitor`** (BREAKING); `hacs.json` name → «SecurARM Monitor».
+
 # SecurARM Monitor
 ![Release](https://img.shields.io/github/v/release/bezuglyy/techlan_monitor?label=Release&style=flat-square) ![HACS](https://img.shields.io/badge/HACS-Custom%20Repository-purple?style=flat-square) ![License](https://img.shields.io/github/license/bezuglyy/techlan_monitor?style=flat-square) ![HA](https://img.shields.io/badge/HA-2025.1%2B-2ea44f?style=flat-square)
 Кастомная интеграция для [Home Assistant](https://www.home-assistant.io) · версия **1.2.5**.
